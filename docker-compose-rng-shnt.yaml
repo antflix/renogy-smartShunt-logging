@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  renogy-data-capture:
+    build:
+      context: .
+    container_name: renogy-data-capture-chrg-ctrl
+    environment:
+      - USE_DOCKER_CONFIG=true
+      # Device config
+      - DEVICE_ADAPTER=hci0
+      - DEVICE_MAC_ADDRESS=C4:D3:6A:67:B5:0C
+      - DEVICE_ALIAS=BT-TH-6A67B50C
+      - DEVICE_TYPE=RNG_CTRL
+      - DEVICE_ID=255
+      # RNG_CTRL => Charge Controller (Rover/Wanderer/Adventurer)
+      # RNG_CTRL_HIST => Charge Controller historical data
+      # RNG_BATT => Smart Battery
+      # RNG_INVT => Inverter
+
+      # Data config
+      - DATA_POLLING_ENABLED=false
+      - DATA_POLL_INTERVAL=20
+      - DATA_TEMP_UNIT=F
+      - DATA_FIELDS= # fields to log (comma separated), leave empty for all fields
+
+      # Remote logging config
+      - REMOTE_LOG_ENABLED=false
+      - REMOTE_URL=https://example.com/post_endpoint
+      - REMOTE_AUTH_HEADER=auth_header
+
+      # MQTT config
+      - MQTT_ENABLED=true
+      - MQTT_SERVER=192.168.1.227
+      - MQTT_PORT=1883
+      - MQTT_PUBLISH_TOPIC=solar/state
+      - MQTT_USER=mqtt_pub_user
+      - MQTT_PASSWORD=***********
+
+      # PVOutput config
+      - PVOUT_ENABLED=false
+      - PVOUT_APIKEY=
+      - PVOUT_SYSID=
+    # Optional: If you want to pass a file with environment variables
+    # env_file:
+    #   - ./env_file.env

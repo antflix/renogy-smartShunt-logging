@@ -18,15 +18,15 @@ class DataLogger:
 
     def log_mqtt(self, json_data):
         logging.info(f"mqtt logging")
-        user = self.config['mqtt']['user']
-        password = self.config['mqtt']['password']
-        auth = None if not user or not password else {"username": user, "password": password}
+        # user = self.config['mqtt']['user']
+        # password = self.config['mqtt']['password']
+        # auth = None if not user or not password else {"username": user, "password": password}
 
-        publish.single(
-            self.config['mqtt']['topic'], payload=json.dumps(json_data),
-            hostname=self.config['mqtt']['server'], port=self.config['mqtt'].getint('port'),
-            auth=auth, client_id="renogy-bt"
-        )
+        # publish.single(
+        #     self.config['mqtt']['topic'], payload=json.dumps(json_data),
+        #     hostname=self.config['mqtt']['server'], port=self.config['mqtt'].getint('port'),
+        #     auth=auth, client_id="renogy-bt"
+        # )
 
     def log_pvoutput(self, json_data):
         date_time = datetime.now().strftime("d=%Y%m%d&t=%H:%M")

@@ -1,8 +1,8 @@
-import json
+# import json
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import paho.mqtt.client as mqtt
-from renogybt.DeviceEntry import Instance
+# import paho.mqtt.client as mqtt
+from renogybt.DeviceEntry import DeviceInstance
 
 app = FastAPI()
 
@@ -14,8 +14,8 @@ async def hello_world():
 async def test_ble_device():
     try:
         print("Running example script...")
-        instance = Instance()
-        instance.run()
+        # instance = DeviceInstance()
+        # instance.run()
         
         response = {
             "status_code": 200

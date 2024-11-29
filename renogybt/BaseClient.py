@@ -146,4 +146,4 @@ class BaseClient:
             self.poll_timer.cancel()
         if self.poll_timer is not None: self.read_timer.cancel()
         self.manager.stop()
-        os._exit(os.EX_OK)
+        # os._exit(os.EX_OK) ## ONLY CALL IF YOU WANT TO STOP THE APP PROCESS
