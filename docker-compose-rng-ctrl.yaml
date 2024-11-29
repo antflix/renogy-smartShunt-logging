@@ -5,7 +5,7 @@ services:
     # build:
     #   context: .
     # container_name: renogy-data-capture-chrg-ctrl
-    image: 192.168.1.141:5000/renogy-data-capture-chrg-ctrl:v1.0
+    image: 192.168.1.141:5000/renogy-data-capture-chrg-ctrl:1.0
     devices:
       # - /dev/serial1:/dev/serial1
       - /dev/hci0:/dev/hci0
