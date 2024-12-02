@@ -59,11 +59,13 @@ class Device(gatt.Device):
 
     def services_resolved(self):
         super().services_resolved()
+        logging.debug(msg="DEBUG services_resolved")
 
         logging.info("[%s] Resolved services" % (self.mac_address))
         for service in self.services:
             for characteristic in service.characteristics:
                 if characteristic.uuid == self.notify_char_uuid:
+                    logging.debug(msg=f"enable notify: {self.notify_char_uuid}")
                     characteristic.enable_notifications()
                     logging.info("subscribed to notification {}".format(characteristic.uuid))
                 if characteristic.uuid == self.write_char_uuid:
@@ -83,9 +85,12 @@ class Device(gatt.Device):
 
     def characteristic_value_updated(self, characteristic, value):
         super().characteristic_value_updated(characteristic, value)
+        logging.info('characteristic_value_updated')
         self.data_callback(value)
 
     def characteristic_write_value(self, value):
+        logging.debug(msg="DEBUG characteristic_write_value")
+        if not self.write_characteristic: return
         self.write_characteristic.write_value(value)
         self.writing = value
 

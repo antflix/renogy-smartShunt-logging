@@ -53,7 +53,9 @@ def check_config_source():
             'enable_polling': os.getenv('DATA_POLLING_ENABLED', 'false'),
             'poll_interval': os.getenv('DATA_POLL_INTERVAL', '20'),
             'temperature_unit': os.getenv('DATA_TEMP_UNIT', 'F'),
-            'fields': os.getenv('DATA_FIELDS', '')
+            'fields': os.getenv('DATA_FIELDS', ''),
+            'enable_rate_limiter': os.getenv('DATA_RATE_LIMIT_ENABLED', 'false'),
+            'rate_interval': os.getenv('DATA_RATE_INTERVAL', '10'),
         }
         ## Remote logging
         config['remote_logging'] = {
@@ -64,6 +66,7 @@ def check_config_source():
         ## MQTT
         config['mqtt'] = {
             'enabled': os.getenv('MQTT_ENABLED', 'false'),
+            'client_id': os.getenv('MQTT_CLIENT_ID', 'renogy-bt'),
             'server': os.getenv('MQTT_SERVER', ''),
             'port': os.getenv('MQTT_PORT', '1883'),
             'topic': os.getenv('MQTT_PUBLISH_TOPIC', ''),
@@ -93,9 +96,10 @@ def handle_ble_connect_msg(topic, message):
     logging.info(msg=f"Handler for topic: {topic} -> {message}")
     
     # Check if a listener is already running
-    if device_instance is not None and listener_thread is not None and listener_thread.is_alive():
-        logging.info("Device instance is already running.")
-        return
+    if device_instance is not None and listener_thread is not None:
+        if listener_thread.is_alive():
+            logging.info("Device instance is already running.")
+            return
     
     # Create a new device instance and thread
     device_instance = DeviceInstance(config)
@@ -107,13 +111,14 @@ def handle_ble_disconnect_msg(topic, message):
     global device_instance, listener_thread  # Declare globals
     logging.info(msg=f"*****Handler for topic: {topic} -> {message} -> {device_instance.device_inst}******")
     
-    if device_instance and listener_thread and listener_thread.is_alive():
-        # Stop the device instance and wait for the thread to finish
-        device_instance.stop()
-        listener_thread.join()
-        device_instance = None
-        listener_thread = None
-        logging.info("Device instance stopped.")
+    if device_instance and listener_thread:
+        if listener_thread.is_alive():
+            # Stop the device instance and wait for the thread to finish
+            device_instance.stop()
+            listener_thread.join()
+            device_instance = None
+            listener_thread = None
+            logging.info("Device instance stopped.")
     else:
         logging.info("No active device instance to stop.")
 
@@ -125,10 +130,10 @@ def main():
         if not config['mqtt'].getboolean('enabled'):
             logging.error(msg="Please enable MQTT config settings...")
             return
-        
+
         # Initialize MQTTManager
         mqtt_manager_inst = MQTTManager(
-            client_id="renogybt-gatway", 
+            client_id=config['mqtt']['client_id'], 
             broker=config['mqtt']['server'], 
             port=config['mqtt'].getint('port'),
             username=config['mqtt']['user'],

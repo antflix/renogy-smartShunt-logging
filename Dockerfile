@@ -1,16 +1,25 @@
 # Use an official Python runtime as a base image
-FROM python:3.10-slim
+# FROM python:3.12-slim
+FROM arm32v7/python:3.12
 
+ENV PYTHONDONTWRITEBYTECODE 1 
+ENV PYTHONUNBUFFERED 1
+ENV VIRTUAL_ENV=/venv
+
+# Copy everything
+COPY . /app
 # Set the working directory
 WORKDIR /app
+# remove virtual directory
+RUN rm -rf ./venv
+# Copy the bluetooth setup script
+RUN chmod +x /app/setup.sh
 
 # Update sources and include required repositories
 RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     build-essential \
-    systemd \
-    systemd-sysv \
     libdbus-glib-1-dev \
     libgirepository1.0-dev \
     libcairo2-dev \
@@ -39,18 +48,11 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
 #     && apt-get clean \
 #     && rm -rf /var/lib/apt/lists/*
 
-# Copy all application files into the container
-COPY . /app
+COPY requirements.txt /app/
+RUN python3 -m pip install -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Set PYTHONPATH if your application needs custom module paths
+ENV PYTHONPATH=/app
 
-# Command to run the application
-# CMD ["python", "main.py"]
-
-# Copy the entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Set the entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash", "/app/setup.sh"]
+ENTRYPOINT ["python3", "/app/main.py"]

@@ -4,8 +4,8 @@ services:
   renogy-data-capture:
     # build:
     #   context: .
-    # container_name: renogy-data-capture-chrg-ctrl
-    image: 192.168.1.141:5000/renogy-data-capture-chrg-ctrl:1.0
+    # container_name: renogy-data-capture
+    image: 192.168.1.141:5000/renogy-data-capture:1.1
     devices:
       # - /dev/serial1:/dev/serial1
       - /dev/hci0:/dev/hci0
@@ -28,12 +28,16 @@ services:
       # RNG_CTRL_HIST => Charge Controller historical data
       # RNG_BATT => Smart Battery
       # RNG_INVT => Inverter
+      # RNG_SHNT => Smart Shunt
 
       # Data config
-      - DATA_POLLING_ENABLED=false
-      - DATA_POLL_INTERVAL=20
+      - DATA_POLLING_ENABLED=true
+      - DATA_POLL_INTERVAL=10
+      - DATA_RATE_LIMIT_ENABLED=false
+      - DATA_RATE_INTERVAL=10
       - DATA_TEMP_UNIT=F
-      - DATA_FIELDS= # fields to log (comma separated), leave empty for all fields
+      # fields to log (comma separated), leave empty for all fields
+      - DATA_FIELDS=
 
       # Remote logging config
       - REMOTE_LOG_ENABLED=false
@@ -42,10 +46,11 @@ services:
 
       # MQTT config
       - MQTT_ENABLED=true
+      - MQTT_CLIENT_ID=renogy-bt-chrg-ctrl
       - MQTT_SERVER=192.168.1.227
       - MQTT_PORT=1883
-      - MQTT_PUBLISH_TOPIC=solar/state
-      - MQTT_USER=mqtt_pub_user
+      - MQTT_PUBLISH_TOPIC=renogy-ble/solar/charge/state
+      - MQTT_USER=mqtt_user
       - MQTT_PASSWORD=***********
 
       # PVOutput config

@@ -1,11 +1,8 @@
 import logging
 import configparser
-import os
-import sys
-import time
 import threading
 from dotenv import load_dotenv
-from renogybt import BaseClient, InverterClient, RoverClient, RoverHistoryClient, BatteryClient, DataLogger, Utils
+from renogybt import ShuntClient, InverterClient, RoverClient, RoverHistoryClient, BatteryClient, DataLogger, Utils, RateLimiter
 
 # logging.basicConfig(level=logging.DEBUG)
 
@@ -13,9 +10,10 @@ class DeviceInstance:
     def __init__(self, config: configparser.ConfigParser):
         self.config = config
         self.data_logger: DataLogger = DataLogger(config)
-        self.device_inst: RoverClient | InverterClient = None
+        self.device_inst: ShuntClient | RoverClient | InverterClient = None
         self._stop_event = threading.Event()
         self._initialized_event = threading.Event()  # Event to signal device initialization
+        self.rate_limiter = RateLimiter(interval=config['data'].getint('rate_interval')) if config['data'].getboolean('enable_rate_limiter') == True else None # Process every X seconds
 
         
     def stop(self):
@@ -34,8 +32,11 @@ class DeviceInstance:
     def run(self):        
         # the callback func when you receive data
         def on_data_received(client, data):
+            if self.rate_limiter:
+                if not self.rate_limiter.should_process(): return # skips message until interval has elapsed
+            
             filtered_data = Utils.filter_fields(data, self.config['data']['fields'])
-            logging.debug("{} => {}".format(client.device.alias(), filtered_data))
+            # logging.debug("{} => {}".format(client.device.alias(), filtered_data))
             if self.config['remote_logging'].getboolean('enabled'):
                 self.data_logger.log_remote(json_data=filtered_data)
             if self.config['mqtt'].getboolean('enabled'):
@@ -53,6 +54,10 @@ class DeviceInstance:
         # start client
         if self.config['device']['type'] == 'RNG_CTRL':
             self.device_inst = RoverClient(self.config, on_data_received, on_error)
+            self._initialized_event.set()  # Signal that the device is ready
+            self.device_inst.connect()
+        elif self.config['device']['type'] == 'RNG_SHNT':
+            self.device_inst = ShuntClient(self.config, on_data_received, on_error)
             self._initialized_event.set()  # Signal that the device is ready
             self.device_inst.connect()
         # elif self.config['device']['type'] == 'RNG_CTRL_HIST':
