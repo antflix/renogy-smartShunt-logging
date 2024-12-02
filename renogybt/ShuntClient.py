@@ -88,7 +88,7 @@ class ShuntClient(BaseClient):
         data = {}
         # temp_unit = self.config['data']['temperature_unit']
         data['charge_battery_voltage'] = bytes_to_int(bs, 25, 3, scale = 0.001) # 0xA6 (#1)
-        data['stater_battery_voltage'] = bytes_to_int(bs, 30, 2, scale = 0.001) # 0xA6 (#2)
+        data['starter_battery_voltage'] = bytes_to_int(bs, 30, 2, scale = 0.001) # 0xA6 (#2)
         data['discharge_amps'] = bytes_to_int(bs, 21, 3, scale = 0.001, signed=True) # 0xA4 (#1)
         data['discharge_watts'] = round((data['charge_battery_voltage'] * data['discharge_amps']), 2)
         data['temperature_sensor_1'] = 0.00 if bytes_to_int(bs, 67, 1) == 0 else bytes_to_int(bs, 66, 3, scale = 0.001) # 0xAD (#3)
