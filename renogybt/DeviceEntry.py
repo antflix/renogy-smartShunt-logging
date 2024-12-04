@@ -36,15 +36,15 @@ class DeviceInstance:
                 if not self.rate_limiter.should_process(): return # skips message until interval has elapsed
             
             filtered_data = Utils.filter_fields(data, self.config['data']['fields'])
-            # logging.debug("{} => {}".format(client.device.alias(), filtered_data))
+            logging.debug("{} => {}".format(client.device.alias(), filtered_data))
             if self.config['remote_logging'].getboolean('enabled'):
                 self.data_logger.log_remote(json_data=filtered_data)
             if self.config['mqtt'].getboolean('enabled'):
                 self.data_logger.log_mqtt(json_data=filtered_data)
             if self.config['pvoutput'].getboolean('enabled') and self.config['device']['type'] == 'RNG_CTRL':
                 self.data_logger.log_pvoutput(json_data=filtered_data)
-            if not self.config['data'].getboolean('enable_polling'):
-                logging.info(msg="Enable device polling to continue...")
+            if not self.config['data'].getboolean('enable_polling') and not self.config['data'].getboolean('enable_rate_limiter'):
+                logging.info(msg="Enable device polling or rate limiter to continue...")
                 # self.stop()
 
         # error callback

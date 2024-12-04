@@ -16,6 +16,9 @@ NOTIFY_CHAR_UUID = "0000c411-0000-1000-8000-00805f9b34fb"
 WRITE_CHAR_UUID  = "" # RMTShunt sends all data over notify to any connected device
 READ_TIMEOUT = 30 # (seconds)
 
+RECONNECT_DELAY = 5  # Time in seconds to wait before reconnecting
+MAX_RECONNECT_ATTEMPTS = 15  # Maximum number of reconnect attempts
+
 class BaseClient:
     def __init__(self, config):
         self.config: configparser.ConfigParser = config
@@ -25,6 +28,7 @@ class BaseClient:
         self.device_id = self.config['device'].getint('device_id')
         self.sections = []
         self.section_index = 0
+        self.reconnect_attempts = 0
         logging.info(f"Init {self.__class__.__name__}: {self.config['device']['alias']} => {self.config['device']['mac_addr']}")
 
     def connect(self):
@@ -38,15 +42,42 @@ class BaseClient:
                     logging.debug(f"Possible device found! ======> {dev.alias()} > [{dev.mac_address}]")
             self.__stop_service()
 
-        self.device = Device(mac_address=self.config['device']['mac_addr'], manager=self.manager, on_resolved=self.__on_resolved, on_data=self.on_data_received, on_connect_fail=self.__on_connect_fail, notify_uuid=NOTIFY_CHAR_UUID, write_uuid=WRITE_CHAR_UUID)
+        self.device = Device(mac_address=self.config['device']['mac_addr'], 
+                             manager=self.manager, 
+                             on_resolved=self.__on_resolved, 
+                             on_data=self.on_data_received, 
+                             on_connect_fail=self.__on_connect_fail, 
+                             notify_uuid=NOTIFY_CHAR_UUID, 
+                             write_uuid=WRITE_CHAR_UUID)
         
-        try:
-            self.device.connect()
-            self.manager.run()
-        except Exception as e:
-            self.__on_error(True, e)
-        except KeyboardInterrupt:
-            self.__on_error(False, "KeyboardInterrupt")
+        while self.reconnect_attempts < MAX_RECONNECT_ATTEMPTS:
+            try:
+                logging.info(f"Attempting to connect, try {self.reconnect_attempts + 1}/{MAX_RECONNECT_ATTEMPTS}...\n")
+                self.device.connect()
+                self.manager.run()
+                self.reconnect_attempts = 0  # Reset attempts on successful connection
+                logging.info("Connected successfully!\n")
+                break
+            except Exception as e:
+                self.reconnect_attempts += 1
+                logging.warning(f"Connection failed with error: {e}. Retrying in {RECONNECT_DELAY} seconds...\n")
+                time.sleep(RECONNECT_DELAY)
+            except KeyboardInterrupt:
+                logging.error("KeyboardInterrupt detected. Exiting...")
+                self.__on_error(False, "KeyboardInterrupt")
+                break
+
+        if self.reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+            logging.error("Max reconnect attempts reached. Could not establish connection.")
+            self.__on_error(True, "Max reconnect attempts reached.")
+        
+        # try:
+        #     self.device.connect()
+        #     self.manager.run()
+        # except Exception as e:
+        #     self.__on_error(True, e)
+        # except KeyboardInterrupt:
+        #     self.__on_error(False, "KeyboardInterrupt")
 
     def disconnect(self):
         self.device.disconnect()
@@ -66,12 +97,12 @@ class BaseClient:
         # self.read_timer.start()
         
     def on_data_received(self, response):
-        logging.debug(msg=f"DEBUG on_data_received")
+        # logging.debug(msg=f"DEBUG on_data_received")
         # self.read_timer.cancel()
         operation = bytes_to_int(response, 1, 1)
 
         if operation == 87: # notify operation
-            logging.info("on_data_received: response for notify operation")
+            # logging.info("on_data_received: response for notify operation")
             if (self.section_index < len(self.sections) and
                 self.sections[self.section_index]['parser'] != None and
                 self.sections[self.section_index]['words'] == len(response)):
@@ -92,8 +123,15 @@ class BaseClient:
 
     def __on_connect_fail(self, error):
         logging.error(f"Connection failed: {error}")
-        self.__safe_callback(self.on_error_callback, error)
-        self.__stop_service()
+        ## try reconnect attempts then throw error if that fails
+        if(self.reconnect_attempts == 0):
+            ## device disconnected
+            self.connect()
+        
+        raise Exception(error)
+        
+        # self.__safe_callback(self.on_error_callback, error)
+        # self.__stop_service()
 
     def __safe_callback(self, calback, param):
         if calback is not None:
@@ -107,5 +145,6 @@ class BaseClient:
         #     self.poll_timer.cancel()
         # if self.poll_timer is not None and self.read_timer is not None:
         #     self.read_timer.cancel()
-        self.manager.stop()
+        if self.manager:
+            self.manager.stop()
         # os._exit(os.EX_OK) ## ONLY CALL IF YOU WANT TO STOP THE APP PROCESS

@@ -25,7 +25,7 @@ class DataLogger:
         publish.single(
             self.config['mqtt']['topic'], payload=json.dumps(json_data),
             hostname=self.config['mqtt']['server'], port=self.config['mqtt'].getint('port'),
-            auth=auth, client_id="renogy-bt", retain=True
+            auth=auth, client_id=self.config['mqtt']['client_id'], retain=True
         )
 
     def log_pvoutput(self, json_data):
