@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 import logging
-
+import json
 class MQTTManager(mqtt.Client):
     def __init__(self, broker, port=1883, client_id="", username=None, password=None, keepalive=60):
          # Create MQTT client instance
@@ -9,12 +9,28 @@ class MQTTManager(mqtt.Client):
         self.port = port
         self.keepalive = keepalive
         self.subscriptions = {}
-
+        self.published_devices = set()
         # Set username and password if provided
         if username and password:
             self.username_pw_set(username, password)
 
-
+  def create_mqtt_device(self, device_name, device_info):
+      topic = f"homeassistant/sensor/{device_name}/config"
+      payload = {
+          "name": device_name,
+          "state_topic": f"{self.topic_prefix}/{device_name}/state",
+          "unique_id": device_info.get("unique_id"),
+          "device": {
+              "identifiers": [device_info.get("unique_id")],
+              "name": device_name,
+              "manufacturer": device_info.get("manufacturer"),
+              "model": device_info.get("model"),
+          },
+          "unit_of_measurement": device_info.get("unit"),
+          "value_template": "{{ value_json.value }}"
+      }
+      self.client.publish(topic, json.dumps(payload), retain=True)
+      self.published_devices.add(device_name)
 
     def on_connect(self, client, userdata, flags, rc, properties=None):
         """
