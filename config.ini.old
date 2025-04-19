@@ -1,19 +1,19 @@
 
 [device]
 adapter = hci0
-mac_addr = 4C:E1:74:58:CE:5D
-alias = RTMShunt30032000454
-type = RNG_SHNT
+mac_addr = C4:D3:6A:67:B5:0C # <-- must update
+alias = BT-TH-6A67B50C # <-- must update
+type = RNG_CTRL
 # RNG_CTRL => Charge Controller (Rover/Wanderer/Adventurer)
 # RNG_CTRL_HIST => Charge Controller historical data
 # RNG_BATT => Smart Battery
 # RNG_INVT => Inverter
-device_id = 255
+device_id = 255 # modify if hub mode or daisy chain (see readme)
 
 [data]
-enable_polling = true # periodically read data
+enable_polling = false # periodically read data
 poll_interval = 60 # read data interval (seconds)
-enable_rate_limiter = true # notify Data config => RNG_SHNT
+enable_rate_limiter = false # notify Data config => RNG_SHNT
 rate_interval = 10 # interval in (seconds)
 temperature_unit = F # F = Fahrenheit, C = Celsius
 fields = # fields to log (comma separated), leave empty for all fields
@@ -24,13 +24,13 @@ url = https://example.com/post.php
 auth_header = auth_header # optional HTTP header sent as "Authorization: Bearer <AUTH_HEADER>"
 
 [mqtt]
-enabled = true
-client_id = renogy-smartshunt
-server = 10.0.0.195
+enabled = false
+client_id = renogy-by-chrg-ctrl
+server = 192.168.1.123
 port = 1883
 topic = solar/state
-user = ant
-password = Ameo1988!
+user =
+password =
 
 [pvoutput]
 # free accounts has a cap of max one request per minute.

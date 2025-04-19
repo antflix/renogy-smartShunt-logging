@@ -1,42 +1,82 @@
+
 import logging
 import configparser
 import os
 import sys
-from renogybt import InverterClient, RoverClient, RoverHistoryClient, BatteryClient, DataLogger, Utils
+import time
+from renogybt import ShuntClient, InverterClient, RoverClient, RoverHistoryClient, BatteryClient, DataLogger, Utils
+from mqtt_manager import MQTTManager
 
+# Logging setup
 logging.basicConfig(level=logging.DEBUG)
 
+# Load config
 config_file = sys.argv[1] if len(sys.argv) > 1 else 'config.ini'
 config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), config_file)
 config = configparser.ConfigParser(inline_comment_prefixes=('#'))
 config.read(config_path)
 data_logger: DataLogger = DataLogger(config)
 
-# the callback func when you receive data
+# MQTT Setup
+MQTT_BROKER = config['mqtt']['server']
+MQTT_PORT = config.getint('mqtt', 'port', fallback=1883)
+MQTT_USER = config['mqtt'].get('user')
+MQTT_PASS = config['mqtt'].get('password')
+MQTT_TOPIC_PREFIX = config['mqtt'].get('topic', fallback="solar/state")
+
+mqttc = MQTTManager(
+    broker=MQTT_BROKER,
+    port=MQTT_PORT,
+    username=MQTT_USER,
+    password=MQTT_PASS
+)
+mqttc.connect_to_broker()
+mqttc.start()
+
+# Polling interval limiter
+last_mqtt_publish = 0
+
 def on_data_received(client, data):
+    global last_mqtt_publish
+    now = time.time()
+    poll_interval = config['data'].getint('poll_interval', fallback=60)
+
+    if now - last_mqtt_publish < poll_interval:
+        return  # skip until interval elapses
+    last_mqtt_publish = now
+
     filtered_data = Utils.filter_fields(data, config['data']['fields'])
-    logging.debug("{} => {}".format(client.device.alias(), filtered_data))
+    logging.debug(f"{client.device.alias()} => {filtered_data}")
+
+    # Publish to MQTT
+    if config['mqtt'].getboolean('enabled'):
+        for key, value in filtered_data.items():
+            topic = f"{MQTT_TOPIC_PREFIX}/{key}/state"
+            mqttc.publish_message(topic=topic, payload=str(value), retain=True)
+
     if config['remote_logging'].getboolean('enabled'):
         data_logger.log_remote(json_data=filtered_data)
-    if config['mqtt'].getboolean('enabled'):
-        data_logger.log_mqtt(json_data=filtered_data)
+
     if config['pvoutput'].getboolean('enabled') and config['device']['type'] == 'RNG_CTRL':
         data_logger.log_pvoutput(json_data=filtered_data)
+
     if not config['data'].getboolean('enable_polling'):
         client.disconnect()
 
-# error callback
 def on_error(client, error):
     logging.error(f"on_error: {error}")
 
-# start client
-if config['device']['type'] == 'RNG_CTRL':
+# Start correct client based on config
+device_type = config['device']['type']
+if device_type == 'RNG_CTRL':
     RoverClient(config, on_data_received, on_error).connect()
-elif config['device']['type'] == 'RNG_CTRL_HIST':
+elif device_type == 'RNG_CTRL_HIST':
     RoverHistoryClient(config, on_data_received, on_error).connect()
-elif config['device']['type'] == 'RNG_BATT':
+elif device_type == 'RNG_BATT':
     BatteryClient(config, on_data_received, on_error).connect()
-elif config['device']['type'] == 'RNG_INVT':
+elif device_type == 'RNG_INVT':
     InverterClient(config, on_data_received, on_error).connect()
+elif device_type == 'RNG_SHNT':
+    ShuntClient(config, on_data_received, on_error).connect()
 else:
     logging.error("unknown device type")

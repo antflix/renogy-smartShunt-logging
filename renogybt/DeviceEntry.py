@@ -70,4 +70,74 @@ class DeviceInstance:
             self.device_inst.connect()
         else:
             logging.error("unknown device type")
-        
+        if self.config['mqtt'].getboolean('enabled'):
+            self.publish_discovery_messages()
+
+    def publish_discovery_messages(self):
+        import json
+        import paho.mqtt.publish as publish
+        discovery_base = "homeassistant/sensor"
+        sensor_configs = {
+            "charge_battery_voltage": {
+                "name": "Charge Battery Voltage",
+                "unit": "V",
+                "device_class": "voltage"
+            },
+            "starter_battery_voltage": {
+                "name": "Starter Battery Voltage",
+                "unit": "V",
+                "device_class": "voltage"
+            },
+            "discharge_amps": {
+                "name": "Discharge Amps",
+                "unit": "A",
+                "device_class": "current"
+            },
+            "discharge_watts": {
+                "name": "Discharge Watts",
+                "unit": "W",
+                "device_class": "power"
+            },
+            "temperature_sensor_1": {
+                "name": "Temperature Sensor 1",
+                "unit": "°C",
+                "device_class": "temperature"
+            },
+            "temperature_sensor_2": {
+                "name": "Temperature Sensor 2",
+                "unit": "°C",
+                "device_class": "temperature"
+            },
+            "Shunt_SOC": {
+                "name": "Shunt SOC",
+                "unit": "%",
+                "device_class": "percentage"
+            },
+        }
+
+        def _get_auth():
+            user = self.config['mqtt']['user']
+            password = self.config['mqtt']['password']
+            return None if not user or not password else {"username": user, "password": password}
+
+        for key, cfg in sensor_configs.items():
+            topic = f"{discovery_base}/renogy_{key}/config"
+            payload = {
+                "name": cfg["name"],
+                "state_topic": self.config['mqtt']['topic'],
+                "value_template": f"{{{{ value_json.{key} }}}}",
+                "unit_of_measurement": cfg["unit"],
+                "device_class": cfg["device_class"],
+                "unique_id": f"renogy_{key}"
+            }
+
+            publish.single(
+                topic,
+                payload=json.dumps(payload),
+                hostname=self.config['mqtt']['server'],
+                port=self.config['mqtt'].getint('port'),
+                auth=_get_auth(),
+                client_id=None,
+                retain=True
+            )
+            logging.info(f"Published discovery config for {cfg['name']}")

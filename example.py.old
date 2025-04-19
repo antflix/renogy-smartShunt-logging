@@ -1,0 +1,92 @@
+import logging
+import configparser
+import os
+import sys
+from renogybt import ShuntClient, InverterClient, RoverClient, RoverHistoryClient, BatteryClient, DataLogger, Utils
+
+logging.basicConfig(level=logging.DEBUG)
+
+config_file = sys.argv[1] if len(sys.argv) > 1 else 'config.ini'
+config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), config_file)
+config = configparser.ConfigParser(inline_comment_prefixes=('#'))
+config.read(config_path)
+data_logger: DataLogger = DataLogger(config)
+
+# the callback func when you receive data
+import time
+last_mqtt_publish = 0  # global
+
+import json
+import paho.mqtt.publish as publish
+
+MQTT_BROKER = "10.0.0.195"
+MQTT_PORT = 1883
+MQTT_USER = "anthony"
+MQTT_PASS = "Ameo1988!"
+BASE_TOPIC = "solar/state"
+
+# name → (unit, device_class)
+SENSORS = {
+    "charge_battery_voltage": ("V", "voltage"),
+    "starter_battery_voltage": ("V", "voltage"),
+    "discharge_amps": ("A", "current"),
+    "discharge_watts": ("W", None),
+    "temperature_sensor_1": ("°C", "temperature"),
+    "temperature_sensor_2": ("°C", "temperature"),
+}
+
+for key, (unit, device_class) in SENSORS.items():
+    payload = {
+        "name": key.replace("_", " ").title(),
+        "state_topic": f"{BASE_TOPIC}/{key}/state",
+        "unique_id": f"shunt_{key}",
+        "unit_of_measurement": unit,
+        "state_class": "measurement",
+    }
+    if device_class:
+        payload["device_class"] = device_class
+
+    publish.single(
+        topic=f"homeassistant/sensor/shunt_{key}/config",
+        payload=json.dumps(payload),
+        hostname=MQTT_BROKER,
+        port=MQTT_PORT,
+        auth={"username": MQTT_USER, "password": MQTT_PASS},
+        retain=True
+    )
+
+def on_data_received(client, data):
+    global last_mqtt_publish
+    now = time.time()
+    if now - last_mqtt_publish < config['data'].getint('poll_interval', fallback=60):
+        return  # skip sending to MQTT if it's been <60 seconds
+
+    last_mqtt_publish = now
+
+    filtered_data = Utils.filter_fields(data, config['data']['fields'])
+    logging.debug("{} => {}".format(client.device.alias(), filtered_data))
+    if config['remote_logging'].getboolean('enabled'):
+        data_logger.log_remote(json_data=filtered_data)
+    if config['mqtt'].getboolean('enabled'):
+        data_logger.log_mqtt(json_data=filtered_data)
+    if config['pvoutput'].getboolean('enabled') and config['device']['type'] == 'RNG_CTRL':
+        data_logger.log_pvoutput(json_data=filtered_data)
+    if not config['data'].getboolean('enable_polling'):
+        client.disconnect()
+# error callback
+def on_error(client, error):
+    logging.error(f"on_error: {error}")
+
+# start client
+if config['device']['type'] == 'RNG_CTRL':
+    RoverClient(config, on_data_received, on_error).connect()
+elif config['device']['type'] == 'RNG_CTRL_HIST':
+    RoverHistoryClient(config, on_data_received, on_error).connect()
+elif config['device']['type'] == 'RNG_BATT':
+    BatteryClient(config, on_data_received, on_error).connect()
+elif config['device']['type'] == 'RNG_INVT':
+    InverterClient(config, on_data_received, on_error).connect()
+elif config['device']['type'] == 'RNG_SHNT':
+    ShuntClient(config, on_data_received, on_error).connect()
+else:
+    logging.error("unknown device type")

@@ -50,7 +50,7 @@ class MQTTManager(mqtt.Client):
         if on_message_callback:
             self.subscriptions[topic] = on_message_callback
 
-    def publish_message(self, topic, payload, qos=0, retain=False):
+    def publish_message(self, topic, payload, qos=0, retain=True):
         logging.info(msg=f"Publishing to topic: {topic}")
         self.publish(topic=topic, payload=payload, qos=qos, retain=retain)
         logging.info(msg=f"Published message: {payload} to topic: {topic}")

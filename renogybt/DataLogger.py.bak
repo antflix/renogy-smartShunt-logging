@@ -4,7 +4,6 @@ import requests
 import paho.mqtt.publish as publish
 from configparser import ConfigParser
 from datetime import datetime
-import uuid
 
 PVOUTPUT_URL = 'http://pvoutput.org/service/r2/addstatus.jsp'
 
@@ -32,7 +31,7 @@ class DataLogger:
                 hostname=self.config['mqtt']['server'],
                 port=self.config['mqtt'].getint('port'),
                 auth=auth,
-                client_id=None,
+                client_id=self.config['mqtt']['client_id'],
                 retain=True
             )
 
