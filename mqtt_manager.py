@@ -14,24 +14,43 @@ class MQTTManager(mqtt.Client):
         if username and password:
             self.username_pw_set(username, password)
 
-  def create_mqtt_device(self, device_name, device_info):
-      topic = f"homeassistant/sensor/{device_name}/config"
-      payload = {
-          "name": device_name,
-          "state_topic": f"{self.topic_prefix}/{device_name}/state",
-          "unique_id": device_info.get("unique_id"),
-          "device": {
-              "identifiers": [device_info.get("unique_id")],
-              "name": device_name,
-              "manufacturer": device_info.get("manufacturer"),
-              "model": device_info.get("model"),
-          },
-          "unit_of_measurement": device_info.get("unit"),
-          "value_template": "{{ value_json.value }}"
-      }
-      self.client.publish(topic, json.dumps(payload), retain=True)
-      self.published_devices.add(device_name)
+    def create_mqtt_device(self, device_name: str, field_name: str, unit: str = "", device_class: str = "", state_class: str = "measurement"):
+        unique_id = f"{device_name}_{field_name}"
+        discovery_topic = f"homeassistant/sensor/{unique_id}/config"
+        state_topic = f"{self.topic_prefix}/{device_name}/{field_name}/state"
 
+        payload = {
+            "name": f"{device_name} {field_name.replace('_', ' ').title()}",
+            "state_topic": state_topic,
+            "unique_id": unique_id,
+            "device": {
+                "identifiers": [device_name],
+                "manufacturer": "Renogy",
+                "model": "SmartShunt",
+                "name": device_name,
+            },
+            "unit_of_measurement": unit,
+            "value_template": "{{ value_json.value }}",
+        }
+
+        if device_class:
+            payload["device_class"] = device_class
+        if state_class:
+            payload["state_class"] = state_class
+
+        self.publish(discovery_topic, json.dumps(payload), retain=True)
+        self.published_devices.add(unique_id)
+
+    def publish_telemetry(self, device_name, telemetry: dict):
+        for field, value in telemetry.items():
+            unique_id = f"{device_name}_{field}"
+            if unique_id not in self.published_devices:
+                unit = self.unit_map.get(field, "")
+                device_class = self.device_class_map.get(field, "")
+                self.create_mqtt_device(device_name, field, unit, device_class)
+
+            topic = f"{self.topic_prefix}/{device_name}/{field}/state"
+            self.publish(topic, json.dumps({"value": value}))
     def on_connect(self, client, userdata, flags, rc, properties=None):
         """
         Callback triggered when the client connects to the broker.
