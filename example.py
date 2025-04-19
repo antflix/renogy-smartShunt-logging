@@ -67,7 +67,7 @@ def on_data_received(client, data):
                 )
 
             topic = f"{MQTT_TOPIC_PREFIX}/{key}/state"
-            mqttc.publish_message(topic=topic, payload=str(value), retain=True)
+            mqttc.publish_message(topic=topic, payload=json.dumps({"value": value}), retain=True)
 
     # Optional: log to remote or pvoutput
     if config['remote_logging'].getboolean('enabled'):
