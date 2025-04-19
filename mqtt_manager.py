@@ -3,7 +3,7 @@ import logging
 import paho.mqtt.client as mqtt
 
 
-class MQTTManager:
+class MQTTManager(mqtt.Client):
 def __init__(self, broker, port=1883, client_id="", username=None, password=None, keepalive=60, topic_prefix="solar/state"):
     super().__init__(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=client_id, reconnect_on_failure=False)
     self.broker = broker
@@ -34,8 +34,7 @@ def __init__(self, broker, port=1883, client_id="", username=None, password=None
 
     def connect_to_broker(self):
         logging.info(f"Connecting to MQTT broker at {self.broker}:{self.port}...")
-        self.client.connect(self.broker, self.port, 60)
-
+        self.connect(self.broker, self.port, 60)
     def start(self):
         self.client.loop_start()
 
@@ -44,8 +43,7 @@ def __init__(self, broker, port=1883, client_id="", username=None, password=None
 
     def publish_message(self, topic, payload, retain=False):
         logging.debug(f"MQTT publish: {topic} => {payload}")
-        self.client.publish(topic, payload, retain=retain)
-
+        self.publish(topic, payload, retain=retain)
     def create_mqtt_device(self, device_name, field_name, unit="", device_class="", state_class="measurement"):
         unique_id = f"{device_name}_{field_name}"
         if unique_id in self.published_devices:
