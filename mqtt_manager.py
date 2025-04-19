@@ -67,14 +67,18 @@ class MQTTManager(mqtt.Client):
         logging.debug(f"MQTT publish: {topic} => {payload}")
         self.publish(topic, payload, retain=retain)
 
-    def create_mqtt_device(self, device_name, field_name, unit="", device_class="", state_class="measurement"):
+    def create_mqtt_device(self, device_name, field_name, unit=None, device_class=None, state_class="measurement"):
         unique_id = f"{device_name}_{field_name}"
         if unique_id in self.published_devices:
             return
-
+    
+        # Use maps only if not passed explicitly
+        unit = unit if unit is not None else self.unit_map.get(field_name.lower(), "")
+        device_class = device_class if device_class is not None else self.device_class_map.get(field_name.lower(), "")
+    
         state_topic = f"{self.topic_prefix}/{field_name}/state"
         discovery_topic = f"homeassistant/sensor/{unique_id}/config"
-
+    
         payload = {
             "name": f"{device_name} {field_name.replace('_', ' ').title()}",
             "state_topic": state_topic,
@@ -89,11 +93,11 @@ class MQTTManager(mqtt.Client):
             "unit_of_measurement": unit,
             "value_template": "{{ value_json.value }}",
         }
-
+    
         if device_class:
             payload["device_class"] = device_class
         if state_class:
             payload["state_class"] = state_class
-
+    
         self.publish_message(discovery_topic, json.dumps(payload), retain=True)
         self.published_devices.add(unique_id)
