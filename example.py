@@ -42,18 +42,34 @@ def on_data_received(client, data):
     poll_interval = config['data'].getint('poll_interval', fallback=60)
 
     if now - last_mqtt_publish < poll_interval:
-        return  # skip until interval elapses
+        return
     last_mqtt_publish = now
 
     filtered_data = Utils.filter_fields(data, config['data']['fields'])
-    logging.debug(f"{client.device.alias()} => {filtered_data}")
+    device_name = client.device.alias()
+    logging.debug(f"{device_name} => {filtered_data}")
 
     # Publish to MQTT
     if config['mqtt'].getboolean('enabled'):
         for key, value in filtered_data.items():
+            sensor_id = f"{device_name}_{key}"
+
+            if sensor_id not in mqttc.published_devices:
+                # Optional: adjust units and device_class
+                unit = mqttc.unit_map.get(key.lower(), "")
+                device_class = mqttc.device_class_map.get(key.lower(), "")
+                mqttc.create_mqtt_device(
+                    device_name=device_name,
+                    field_name=key,
+                    unit=unit,
+                    device_class=device_class,
+                    state_class="measurement"
+                )
+
             topic = f"{MQTT_TOPIC_PREFIX}/{key}/state"
             mqttc.publish_message(topic=topic, payload=str(value), retain=True)
 
+    # Optional: log to remote or pvoutput
     if config['remote_logging'].getboolean('enabled'):
         data_logger.log_remote(json_data=filtered_data)
 
@@ -62,7 +78,6 @@ def on_data_received(client, data):
 
     if not config['data'].getboolean('enable_polling'):
         client.disconnect()
-
 def on_error(client, error):
     logging.error(f"on_error: {error}")
 
