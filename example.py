@@ -55,16 +55,7 @@ def on_data_received(client, data):
             sensor_id = f"{device_name}_{key}"
 
             if sensor_id not in mqttc.published_devices:
-                # Optional: adjust units and device_class
-                unit = mqttc.unit_map.get(key.lower(), "")
-                device_class = mqttc.device_class_map.get(key.lower(), "")
-                mqttc.create_mqtt_device(
-                    device_name=device_name,
-                    field_name=key,
-                    unit=unit,
-                    device_class=device_class,
-                    state_class="measurement"
-                )
+                mqttc.create_mqtt_device(device_name=device_name, field_name=key)
 
             topic = f"{MQTT_TOPIC_PREFIX}/{key}/state"
             mqttc.publish_message(topic=topic, payload=json.dumps({"value": value}), retain=True)
